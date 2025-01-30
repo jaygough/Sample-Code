@@ -7,7 +7,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
 {
     //Manual for this driver implementation is found at: https://avproglobal.egnyte.com/dl/IGVKL3PVpd
     
-    ///<summary><para>Class for controlling / monitoring the AVPro Edge ConferX AC-CX-84 matrix switcher.</para></summary>
+    ///<summary><para>Class for controlling / monitoring the AVPro Edge ConferX AC-CX84-AUHD matrix switcher.</para></summary>
     public class AvProEdgeConferXCx84 : AvProEdgeConferXBase
     { 
         //Internal storage for the current HDMI output modes
