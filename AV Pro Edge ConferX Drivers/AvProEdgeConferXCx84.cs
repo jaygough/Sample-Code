@@ -56,7 +56,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// <summary><para>Construct a new AV Pro Edge ConferX AC-CX-84 matrix switcher that communicates via TCP.</para></summary>
         /// <param name="ipAddress"><see cref="IPAddress"/> of the switcher.</param>
         /// <param name="port">Optional port parameter. Defaults to 23 (telnet port).</param>
-        public AvProEdgeConferXCx84(IPAddress ipAddress, ushort port) : base(ipAddress, port, 8, 4) { }
+        public AvProEdgeConferXCx84(IPAddress ipAddress, ushort port = 23) : base(ipAddress, port, 8, 4) { }
 
         /// <summary><para>Construct a new AV Pro Edge ConferX AC-CX-84 matrix switcher that communicates via serial.</para></summary>
         /// <param name="comPort">Crestron <see cref="ComPort"/> that is connected to the switcher.</param>

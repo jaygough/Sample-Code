@@ -61,7 +61,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// <summary><para>
         /// Property to get the current TCP connection status.
         /// </para></summary>
-        public bool isTcpClientConnected => ConferxClient is { isClientCurrentlyConnected: true };
+        public bool isTcpClientConnected => ConferxClient is { IsClientCurrentlyConnected: true };
     
         ///<summary><para>Property that stores the current signal status of each input.</para></summary>
         public bool [] CurrentInputSourceDetectionStatus { get; private set; }
@@ -132,6 +132,11 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// </para></summary>
         public bool SupportsTemperatureFunction {get; protected set;}
 
+        /// <summary><para>
+        /// Event triggered when the switcher has successfully connected.
+        /// </para></summary>
+        public event Action onSwitcherNetworkConnectionEstablished;
+
 
         /// <summary><para>
         /// Construct a new AV Pro Edge ConferX matrix switcher using a provided valid <see cref="System.Net.IPAddress"/>.
@@ -149,9 +154,12 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
             ConferxClient = new TcpIpWrapper(ipAddress, port, 1024)
             {
                 AutoReconnect = true,
-                AutoReconnectInterval = 5,
-                TimeoutInterval = 10
+                AutoReconnectInterval = 5
             };
+            
+            //Set up the connection listener.
+            ConferxClient.OnClientConnected += () => onSwitcherNetworkConnectionEstablished?.Invoke();
+            
 
             //Set up the gather for device responses.
             ConferxClient.OnTextReceived += _gather.GatherOnDataReceived;
@@ -374,8 +382,6 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
             ConferxComPort?.Send(dataToSend + "\r\n");
             ConferxClient?.SendText(dataToSend + "\r\n");
         }
-
-        protected virtual void HandleModelSpecificCommand(string response) {}
 
         //Processes all responses from the switcher, and parses out return values.
         private void ProcessResponse(string command)
