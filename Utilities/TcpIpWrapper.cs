@@ -15,13 +15,15 @@ namespace ExampleSourceCode.Utilities
     public class TcpIpWrapper
     {
         //The internal Crestron TCP client 
-        private readonly TCPClient _client;
+        private TCPClient _client;
 
         //Allows the auto reconnect method to know if the connection was manually stopped.
         private bool _userManuallyDisconnected;
 
         //Prevents multiple triggers of the auto reconnect method.
         private bool _reconnectAttemptInProgress;
+
+        private CTimer _autoReconnectionTimer;
     
         /// <summary><para>
         /// The <see cref="IPAddress"/> this client will use to connect to the remote device.
@@ -36,8 +38,15 @@ namespace ExampleSourceCode.Utilities
         /// <summary><para>
         /// Property to set the auto reconnect behaviour of this client.
         /// </para></summary>
-
-        private ushort _internalTimeout;
+        
+        /// <summary><para>
+        /// Property to set the buffer size.
+        /// </para></summary>
+        private int BufferSize { get; set; }
+        
+        /// <summary><para>
+        /// Property to set the auto reconnect behaviour.
+        /// </para></summary>
         public bool AutoReconnect { get; set; }
     
         /// <summary><para>
@@ -48,17 +57,19 @@ namespace ExampleSourceCode.Utilities
         /// <summary><para>
         /// Amount of time (in seconds) to wait before a request officially times out.
         /// </para></summary>
-        public int TimeoutInterval { get; set; } = 1000;
+        public int TimeoutInterval { get; private set; } = 1000;
 
         /// <summary><para>
         /// Property to tell if the client is currently connected.
         /// </para></summary>
-        public bool isClientCurrentlyConnected => _client.ClientStatus == SocketStatus.SOCKET_STATUS_CONNECTED;
+        public bool IsClientCurrentlyConnected => _client.ClientStatus == SocketStatus.SOCKET_STATUS_CONNECTED;
     
         /// <summary><para>
         /// Event that is invoked whenever the client receives data.
         /// </para></summary>
         public event Action<string> OnTextReceived;
+
+        public event Action OnClientConnected;
 
         /// <summary><para>
         /// Construct a new TCP Wrapper object for streamlined socket communications with networked devices.
@@ -70,9 +81,13 @@ namespace ExampleSourceCode.Utilities
         {
             IpAddress = address;
             Port = port;
-            _client = new TCPClient(IpAddress.ToString(), Port, bufferSize);
-            _client.SocketSendOrReceiveTimeOutInMs = 1000; //1 second timeout
-            _client.SocketStatusChange += ClientOnSocketStatusChange;
+            BufferSize = bufferSize;
+            _autoReconnectionTimer = new CTimer(_ => Connect(), Timeout.Infinite);
+            CrestronEnvironment.ProgramStatusEventHandler += type =>
+            {
+                if (type == eProgramStatusEventType.Stopping)
+                    Disconnect();
+            };
         }
 
         private void ClientOnSocketStatusChange(TCPClient mytcpclient, SocketStatus clientsocketstatus)
@@ -84,37 +99,40 @@ namespace ExampleSourceCode.Utilities
 
         public void Connect()
         {
-            _userManuallyDisconnected = false;
-            switch (_client.ClientStatus)
+            if (_client != null && IsClientCurrentlyConnected)
             {
-                case SocketStatus.SOCKET_STATUS_CONNECTED:
-                    throw new SocketException("Socket connection has already been established.");
-                case SocketStatus.SOCKET_STATUS_WAITING:
-                    throw new SocketException("Socket is pending connection from a previous connect request.");
-                default:
-                    _reconnectAttemptInProgress = true;
-                    _client.ConnectToServerAsync(ClientConnectResult);
-                    break;
+                CrestronConsole.PrintLine("TCP client is already connected.");
+                return;
             }
+
+            _client = new TCPClient(IpAddress.ToString(), Port, BufferSize);
+            _client.SocketSendOrReceiveTimeOutInMs = TimeoutInterval; //1 second timeout
+            _client.SocketStatusChange += ClientOnSocketStatusChange;
+            _userManuallyDisconnected = false;
+            _reconnectAttemptInProgress = true;
+            _client.ConnectToServerAsync(ClientConnectResult);
         }
 
         private void ClientReceiveDataAsync(TCPClient theClient, int numberofbytesreceived)
         {
+            CrestronConsole.PrintLine("Received {0} bytes", numberofbytesreceived);
             //Async method for receiving client data.
-        
+
             //Don't need to do anything if there aren't any bytes to receive.
             if (numberofbytesreceived > 0)
             {
                 //Create an array of the bytes received by the client.
-                var theBuffer = theClient.IncomingDataBuffer.Take(numberofbytesreceived).ToArray();
-            
+                var theBuffer = _client.IncomingDataBuffer.Take(numberofbytesreceived).ToArray();
+
                 //Convert the array of bytes to ascii (text) format.
                 var toAscii = Encoding.ASCII.GetString(theBuffer);
-            
+
+                CrestronConsole.PrintLine("Received {0}", toAscii);
+
                 //Invoke the text received event.
                 OnTextReceived?.Invoke(toAscii);
             }
-        
+
             //Call this method again to wait for more data.
             theClient.ReceiveDataAsync(ClientReceiveDataAsync);
         }
@@ -122,13 +140,15 @@ namespace ExampleSourceCode.Utilities
         private void ClientConnectResult(TCPClient theClient)
         {
             _reconnectAttemptInProgress = false;
-            if (theClient.ClientStatus == SocketStatus.SOCKET_STATUS_CONNECTED)
+            CrestronConsole.PrintLine("TCP client connect result:" + _client.ClientStatus);
+            if (_client.ClientStatus == SocketStatus.SOCKET_STATUS_CONNECTED)
             {
+                //Trigger the onConnectedEvent
+                OnClientConnected?.Invoke();
                 //Start listening for data.
-                theClient.ReceiveDataAsync(ClientReceiveDataAsync);
+                _client.ReceiveDataAsync(ClientReceiveDataAsync);
+                return;
             }
-
-            if (theClient.ClientStatus == SocketStatus.SOCKET_STATUS_CONNECTED) return;
             
             //Client failed to connect, so let's check if auto-reconnect is enabled.
             if (AutoReconnect)
@@ -139,9 +159,11 @@ namespace ExampleSourceCode.Utilities
         public void Disconnect()
         {
             if (_client.ClientStatus != SocketStatus.SOCKET_STATUS_CONNECTED)
-                throw new SocketException("Client is already disconnected, cannot disconnect.");
-            _client.DisconnectFromServer();
+                //Already disconnected
+                return;
+            _autoReconnectionTimer.Stop();
             _userManuallyDisconnected = true;
+            _client.DisconnectFromServer();
         }
 
         public void SetTimeout(int seconds)
@@ -157,13 +179,14 @@ namespace ExampleSourceCode.Utilities
                 throw new SocketException("Client is disconnected, cannot send text.");
         
             var bytes = Encoding.GetEncoding("ASCII").GetBytes(toSend);
+            CrestronConsole.PrintLine("Sending over TCP: " + BitConverter.ToString(bytes));
             _client.SendDataAsync(bytes, bytes.Length, (client, sent) => {});
         }
 
         private void AutoReconnectMethod()
         {
             if (_reconnectAttemptInProgress || _userManuallyDisconnected) return;
-            var autoReconnectTimer = new CTimer(specific => Connect(), AutoReconnectInterval);
+            _autoReconnectionTimer.Reset(AutoReconnectInterval);
         }
 
         public void Dispose()
