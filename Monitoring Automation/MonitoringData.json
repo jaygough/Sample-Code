@@ -1,0 +1,32 @@
+{
+  "DDM_URL": "https://ddm.url/endpoint",
+  "DDM_API_Key": "DDMKEY",
+  
+  "SageVue_Auth_Query_Endpoint": "https://sagevue.url/authendpoint",
+  "SageVue_Login_Endpoint": "https://sagevue.url/loginendpoint",
+  "SageVue_Systems_Endpoint": "https://sagevue.url/systemsendpoint",
+  "SageVue_Devices_Endpoint": "https://sagevue.url/devicesendpoint",
+  "SageVue_Username": "SagevueUsername",
+  "SageVue_Password": "SagevuePassword",
+
+  "Fusion_SQL_Server": "FusionDatabaseName",
+  "Fusion_SQL_Username": "FusionDatabaseUsername",
+  "Fusion_SQL_Password": "FusionDatabasePassword",
+  
+  "Alert_Channel": "https://endpoint.url/alertendpoint",
+  "Alert_Channel_Token": "AlertToken",
+        
+  "Notify_Channel": "https://endpoint.url/notifyendpoint",
+  "Notify_Channel_Token": "NotifyToken",
+        
+  "Daily_Report_Channel": "https://endpoint.url/reportendpoint",
+  "Daily_Report_Channel_Token": "ReportToken",
+        
+  "Help_Request_Channel": "https://endpoint.url/helprequestendpoint",
+  "Help_Request_Channel_Token": "HelpRequestToken",
+
+  "DDM_Domain_Fetch_Time": "00:00",
+  "Enable_Alerts_Time": "05:30",
+  "Run_Report_Time": "06:00",
+  "Disable_Alerts_Time": "22:00"
+}
