@@ -1,4 +1,4 @@
-# OOP Sample Integrations
+# Object-Oriented Sample Integrations
 Small sampling of OOP integrations for review.
 
 ### Crestron Driver Loading
