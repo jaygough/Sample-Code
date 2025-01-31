@@ -67,6 +67,5 @@ public class SerialGather
 
         //Set the current buffer to the last segment of the split.
         CurrentBuffer = segments[^1];
-        CrestronConsole.PrintLine("[{0}] ", CurrentBuffer);
     }
 }
