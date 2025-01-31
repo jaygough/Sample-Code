@@ -4,7 +4,6 @@ using Crestron.SimplSharp.CrestronSockets;
 using IPAddress = System.Net.IPAddress;
 using Timeout = Crestron.SimplSharp.Timeout;
 
-
 namespace ConferX.Utilities;
 
 /// <summary><para>
@@ -13,7 +12,7 @@ namespace ConferX.Utilities;
 /// </para></summary>
 public class TcpIpWrapper
 {
-    //The internal Crestron TCP client 
+    //The internal Crestron TCP client.
     private TCPClient _client;
 
     //Allows the auto reconnect method to know if the connection was manually stopped.
@@ -21,7 +20,8 @@ public class TcpIpWrapper
 
     //Prevents multiple triggers of the auto reconnect method.
     private bool _reconnectAttemptInProgress;
-
+    
+    //Timer for attempting reconnection.
     private CTimer _autoReconnectionTimer;
     
     /// <summary><para>
@@ -33,10 +33,6 @@ public class TcpIpWrapper
     /// The port this client will use to connect to the remote device.
     /// </para></summary>
     private int Port { get; set; }
-
-    /// <summary><para>
-    /// Property to set the auto reconnect behaviour of this client.
-    /// </para></summary>
         
     /// <summary><para>
     /// Property to set the buffer size.
@@ -68,6 +64,9 @@ public class TcpIpWrapper
     /// </para></summary>
     public event Action<string> OnTextReceived;
 
+    /// <summary><para>
+    /// Event that is invoked whenever the client has connected.
+    /// </para></summary>
     public event Action OnClientConnected;
 
     /// <summary><para>
@@ -88,14 +87,10 @@ public class TcpIpWrapper
                 Disconnect();
         };
     }
-
-    private void ClientOnSocketStatusChange(TCPClient mytcpclient, SocketStatus clientsocketstatus)
-    {
-        if (clientsocketstatus is not (SocketStatus.SOCKET_STATUS_LINK_LOST or SocketStatus.SOCKET_STATUS_BROKEN_REMOTELY or SocketStatus.SOCKET_STATUS_BROKEN_LOCALLY)) return;
-        if (AutoReconnect)
-            AutoReconnectMethod();
-    }
-
+    
+    /// <summary><para>
+    /// Attempt to connect to the server/remote device.
+    /// </para></summary>
     public void Connect()
     {
         if (_client != null && IsClientCurrentlyConnected)
@@ -107,6 +102,52 @@ public class TcpIpWrapper
         _reconnectAttemptInProgress = true;
         _client.ConnectToServerAsync(ClientConnectResult);
     }
+    
+    /// <summary><para>
+    /// Disconnect from the server/remote device.
+    /// </para></summary>
+    public void Disconnect()
+    {
+        if (_client.ClientStatus != SocketStatus.SOCKET_STATUS_CONNECTED)
+            //Already disconnected
+            return;
+        _autoReconnectionTimer.Stop();
+        _userManuallyDisconnected = true;
+        _client.DisconnectFromServer();
+    }
+
+    /// <summary><para>
+    /// Sets the timeout.
+    /// </para></summary>
+    /// <param name="seconds">Number of seconds to wait before timing out.</param>
+    public void SetTimeout(int seconds)
+    {
+        TimeoutInterval = seconds * 1000;
+        if (_client != null) 
+            _client.SocketSendOrReceiveTimeOutInMs = TimeoutInterval;
+    }
+
+    /// <summary><para>
+    /// Sends a text string to the server/remote device.
+    /// </para></summary>
+    /// <exception cref="SocketException">Thrown when attempting to send text with a disconnected client.</exception>
+    public void SendText(string toSend)
+    {
+        if (_client.ClientStatus != SocketStatus.SOCKET_STATUS_CONNECTED)
+            throw new SocketException("Client is disconnected, cannot send text.");
+        
+        var bytes = Encoding.GetEncoding("ASCII").GetBytes(toSend);
+        _client.SendDataAsync(bytes, bytes.Length, (client, sent) => {});
+    }
+
+    //If a disconnect is detected, try to reconnect if auto-reconnect is enabled.
+    private void ClientOnSocketStatusChange(TCPClient mytcpclient, SocketStatus clientsocketstatus)
+    {
+        if (clientsocketstatus is not (SocketStatus.SOCKET_STATUS_LINK_LOST or SocketStatus.SOCKET_STATUS_BROKEN_REMOTELY or SocketStatus.SOCKET_STATUS_BROKEN_LOCALLY)) return;
+        if (AutoReconnect)
+            AutoReconnectMethod();
+    }
+    
     //Async method for receiving client data.
     private void ClientReceiveDataAsync(TCPClient theClient, int numberofbytesreceived)
     {
@@ -127,6 +168,14 @@ public class TcpIpWrapper
         theClient.ReceiveDataAsync(ClientReceiveDataAsync);
     }
 
+    //Auto-reconnect method.
+    private void AutoReconnectMethod()
+    {
+        if (_reconnectAttemptInProgress || _userManuallyDisconnected) return;
+        _autoReconnectionTimer.Reset(AutoReconnectInterval);
+    }
+    
+    //Callback of the connection attempt.
     private void ClientConnectResult(TCPClient theClient)
     {
         _reconnectAttemptInProgress = false;
@@ -141,38 +190,8 @@ public class TcpIpWrapper
 
         //Client failed to connect, so let's check if auto-reconnect is enabled.
         if (AutoReconnect)
+            
+            //Attempt to reconnect.
             AutoReconnectMethod();
-    }
-
-    public void Disconnect()
-    {
-        if (_client.ClientStatus != SocketStatus.SOCKET_STATUS_CONNECTED)
-            //Already disconnected
-            return;
-        _autoReconnectionTimer.Stop();
-        _userManuallyDisconnected = true;
-        _client.DisconnectFromServer();
-    }
-
-    public void SetTimeout(int seconds)
-    {
-        TimeoutInterval = seconds * 1000;
-        if (_client != null) 
-            _client.SocketSendOrReceiveTimeOutInMs = TimeoutInterval;
-    }
-
-    public void SendText(string toSend)
-    {
-        if (_client.ClientStatus != SocketStatus.SOCKET_STATUS_CONNECTED)
-            throw new SocketException("Client is disconnected, cannot send text.");
-        
-        var bytes = Encoding.GetEncoding("ASCII").GetBytes(toSend);
-        _client.SendDataAsync(bytes, bytes.Length, (client, sent) => {});
-    }
-
-    private void AutoReconnectMethod()
-    {
-        if (_reconnectAttemptInProgress || _userManuallyDisconnected) return;
-        _autoReconnectionTimer.Reset(AutoReconnectInterval);
     }
 }
