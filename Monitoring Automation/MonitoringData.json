@@ -9,7 +9,7 @@
   "SageVue_Username": "SagevueUsername",
   "SageVue_Password": "SagevuePassword",
 
-  "Fusion_SQL_Server": "FusionDatabaseName",
+  "Fusion_SQL_Server": "FusionServerAddress",
   "Fusion_SQL_Username": "FusionDatabaseUsername",
   "Fusion_SQL_Password": "FusionDatabasePassword",
   
