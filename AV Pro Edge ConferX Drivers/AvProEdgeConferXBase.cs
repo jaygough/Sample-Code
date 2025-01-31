@@ -1,14 +1,14 @@
-﻿using System;
+﻿using System.Text.RegularExpressions;
+using ConferX.Utilities;
 using Crestron.SimplSharp;
 using Crestron.SimplSharpPro;
-using ExampleSourceCode.Utilities;
 using IPAddress = System.Net.IPAddress;
 
-namespace ExampleSourceCode.AvProEdgeConferXDriver
+namespace ConferX.AvProEdgeConferXDriver
 {
     /// <summary><para>Base class for controlling / monitoring the ConferX line of AVPro Edge Matrix Switchers.</para></summary>
     /// Models Supported - AC-CX42-AUHD | AC-CX62-AUHD | AC-CX84-AUHD
-    public abstract class AvProEdgeConferXBase
+    public abstract partial class AvProEdgeConferXBase
     {
         //The required com port specs as detailed by the manufacturer.
         private const ComPort.eComBaudRates ComPortBaudRate = ComPort.eComBaudRates.ComspecBaudRate57600;
@@ -67,11 +67,14 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         public bool [] CurrentInputSourceDetectionStatus { get; private set; }
     
         ///<summary><para>Property that stores the current routing of each output.</para></summary>
-        public ushort [] CurrentOutputSourceSelection { get; private set; }
+        public ushort [] CurrentOutputVideoSourceSelection { get; private set; }
+        
+        ///<summary><para>Property that stores the current routing of each output.</para></summary>
+        public ushort [] CurrentOutputAudioSourceSelection { get; private set; }
     
         ///<summary><para>Property to get the current system address (00-99).</para></summary>
         public ushort SystemAddress { get; private set; }
-    
+
         /// <summary><para>
         /// Property to get the current DHCP status (enabled/disabled)
         /// </para></summary>
@@ -101,11 +104,11 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// Property to get the current subnet mask.
         /// </para></summary>
         public IPAddress NetworkSubnetMask { get; private set; }
-        
+
         /// <summary><para>
         /// Property to get the current system fan speed (0-3).
         /// </para></summary>
-        public ushort SystemFanSpeed { get; private set; }
+        public ushort SystemFanSpeed { get; private set; } = 1;
     
         /// <summary><para>
         /// Property to get the current system fan auto status (on/off).
@@ -195,7 +198,8 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
             CurrentInputSourceDetectionStatus = new bool[NumberOfInputs];
             
             NumberOfOutputs = numberOfOutputs;
-            CurrentOutputSourceSelection = new ushort[NumberOfOutputs];
+            CurrentOutputVideoSourceSelection = new ushort[NumberOfOutputs];
+            CurrentOutputAudioSourceSelection = new ushort[NumberOfOutputs];
         }
 
         protected abstract void SetupSwitcher();
@@ -278,8 +282,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// <param name="ipAddress">New IP address the unit should use.</param>
         public void SetSystemIpAddress(IPAddress ipAddress)
         {
-            if (ipAddress is null)
-                throw new ArgumentNullException(nameof(ipAddress));
+            ArgumentNullException.ThrowIfNull(ipAddress);
             SendToDevice("SET HIP " + ipAddress);
         }
 
@@ -289,8 +292,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// <param name="gatewayAddress">New gateway IP address the unit should use.</param>
         public void SetSystemGatewayAddress(IPAddress gatewayAddress)
         {
-            if (gatewayAddress is null)
-                throw new ArgumentNullException(nameof(gatewayAddress));
+            ArgumentNullException.ThrowIfNull(gatewayAddress);
             SendToDevice("SET RIP " + gatewayAddress);
         }
     
@@ -300,8 +302,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
         /// <param name="subnetMask">New subnet mask the unit should use.</param>
         public void SetSystemSubnetMask(IPAddress subnetMask)
         {
-            if (subnetMask is null)
-                throw new ArgumentNullException(nameof(subnetMask));
+            ArgumentNullException.ThrowIfNull(subnetMask);
             SendToDevice("SET NMK " + subnetMask);
         }
         
@@ -380,7 +381,7 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
                 throw new ArgumentException("Cannot send an empty string to the device.");
 
             ConferxComPort?.Send(dataToSend + "\r\n");
-            ConferxClient?.SendText(dataToSend + "\r\n");
+            ConferxClient?.SendText("\r" + dataToSend + "\r\n");
         }
 
         //Processes all responses from the switcher, and parses out return values.
@@ -427,6 +428,19 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
                     case not null when command.Contains("FAN AUTO"):
                         SystemFanAutoStatus = command.Split(' ')[1] == "1";
                         break;
+                    //Process video routing change
+                    case not null when VideoRouteChange().IsMatch(command):
+                        var outputNumberV = ushort.Parse(command[3].ToString());
+                        var inputNumberV = ushort.Parse(command[10].ToString());
+                        CurrentOutputVideoSourceSelection[outputNumberV] = inputNumberV;
+                        break;
+                    //Process ex-audio routing change
+                    case not null when ExAudioRouteChange().IsMatch(command):
+                        var outputNumberA = ushort.Parse(command[3].ToString());
+                        var inputNumberA = ushort.Parse(command[10].ToString());
+                        CurrentOutputAudioSourceSelection[outputNumberA] = inputNumberA;
+                        break;
+                    
                 }
             }
             catch (Exception ex)
@@ -437,5 +451,13 @@ namespace ExampleSourceCode.AvProEdgeConferXDriver
                 ErrorLog.Error(ex.Message);
             }
         }
+
+        //Regex for video source change.
+        [GeneratedRegex(@"OUT\d\sVS\sIN\d")]
+        private static partial Regex VideoRouteChange();
+        
+        //Regex for ex-audio source change.
+        [GeneratedRegex(@"OUT\d\sAS\sIN\d")]
+        private static partial Regex ExAudioRouteChange();
     }
 }
