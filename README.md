@@ -1,5 +1,5 @@
 # OOP Sample Code
-Small sampling of OOP code for review.
+Small sampling of OOP integrations for review.
 
 ### Crestron Driver Loading
 Class used for loading official Crestron drivers. Can support any type of transport method, and exposes the display object for programs to utilize once the driver is successfully loaded.
