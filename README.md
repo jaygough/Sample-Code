@@ -1,8 +1,8 @@
 # Object-Oriented Sample Integrations
 Small sampling of OOP integrations for review.
 
-### Crestron Driver Loading
-Class used for loading official Crestron drivers. Can support any type of transport method, and exposes the display object for programs to utilize once the driver is successfully loaded.
+### Crestron Display Driver Loading
+Class used for loading official Crestron display drivers. Can support any type of transport method, and exposes the display object for programs to utilize once the driver is successfully loaded.
 
 ### Crestron Join Handler
 Small utility class for streamlining the interaction with TriList objects. Allows for the organization of touch panel joins by name, and linking of events for touch panel actions.
