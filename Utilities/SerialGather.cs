@@ -1,8 +1,7 @@
-﻿using System;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Crestron.SimplSharp;
 
-namespace ExampleSourceCode.Utilities
+namespace ConferX.Utilities
 {
     /// <summary><para>
     /// Simple string gather that triggers an event when a delimiter is encountered from a text stream.
@@ -58,7 +57,7 @@ namespace ExampleSourceCode.Utilities
                 OnDelimiterEncountered?.Invoke(segments[segNum]);
 
             //Set the current buffer to the last segment of the split.
-            CurrentBuffer = segments[segments.Length - 1];
+            CurrentBuffer = segments[^1];
             CrestronConsole.PrintLine("[{0}] ", CurrentBuffer);
         }
 
