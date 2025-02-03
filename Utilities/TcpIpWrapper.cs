@@ -12,6 +12,12 @@ namespace ConferX.Utilities;
 /// </para></summary>
 public class TcpIpWrapper
 {
+    public enum TcpWrapperConnectionStatus
+    {
+        Disconnected,
+        Connected
+    }
+    
     //The internal Crestron TCP client.
     private TCPClient _client;
 
@@ -67,7 +73,7 @@ public class TcpIpWrapper
     /// <summary><para>
     /// Event that is invoked whenever the client has connected.
     /// </para></summary>
-    public event Action OnClientConnected;
+    public event Action <TcpWrapperConnectionStatus> OnClientConnectionChange;
 
     /// <summary><para>
     /// Construct a new TCP Wrapper object for streamlined socket communications with networked devices.
@@ -100,6 +106,7 @@ public class TcpIpWrapper
         _client.SocketStatusChange += ClientOnSocketStatusChange;
         _userManuallyDisconnected = false;
         _reconnectAttemptInProgress = true;
+        
         _client.ConnectToServerAsync(ClientConnectResult);
     }
     
@@ -114,6 +121,7 @@ public class TcpIpWrapper
         _autoReconnectionTimer.Stop();
         _userManuallyDisconnected = true;
         _client.DisconnectFromServer();
+        OnClientConnectionChange?.Invoke(TcpWrapperConnectionStatus.Disconnected);
     }
 
     /// <summary><para>
@@ -146,6 +154,8 @@ public class TcpIpWrapper
         if (clientsocketstatus is not (SocketStatus.SOCKET_STATUS_LINK_LOST or SocketStatus.SOCKET_STATUS_BROKEN_REMOTELY or SocketStatus.SOCKET_STATUS_BROKEN_LOCALLY)) return;
         if (AutoReconnect)
             AutoReconnectMethod();
+        else 
+            OnClientConnectionChange?.Invoke(TcpWrapperConnectionStatus.Disconnected);
     }
     
     //Async method for receiving client data.
@@ -184,14 +194,15 @@ public class TcpIpWrapper
             //Start listening for data.
             _client.ReceiveDataAsync(ClientReceiveDataAsync);
             //Trigger the onConnectedEvent
-            OnClientConnected?.Invoke();
+            OnClientConnectionChange?.Invoke(TcpWrapperConnectionStatus.Connected);
             return;
         }
 
         //Client failed to connect, so let's check if auto-reconnect is enabled.
         if (AutoReconnect)
-            
             //Attempt to reconnect.
             AutoReconnectMethod();
+        else 
+            OnClientConnectionChange?.Invoke(TcpWrapperConnectionStatus.Disconnected);
     }
 }
