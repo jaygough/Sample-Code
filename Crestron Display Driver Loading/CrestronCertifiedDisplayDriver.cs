@@ -3,7 +3,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
-using ControlConceptsExampleCode;
 using Crestron.RAD.Common.Interfaces;
 using Crestron.RAD.Devices.CrestronConnectedDisplay;
 using Crestron.RAD.Drivers.Displays;
